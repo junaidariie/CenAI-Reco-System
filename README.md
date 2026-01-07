@@ -2,6 +2,8 @@
 
 A sophisticated movie recommendation system powered by multiple AI engines including embedding-based search, TF-IDF analysis, and hybrid approaches. Features real-time movie data, sentiment analysis, and AI-powered movie summaries.
 
+LIVE APP : https://junaidariie.github.io/CenAI-Reco-System/
+
 ## 🚀 Features
 
 ### Core Recommendation Engines
