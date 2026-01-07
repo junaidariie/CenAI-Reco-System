@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CineAI | Premium Movie Dashboard</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* --- CSS VARIABLES & RESET --- */
+        :root {
+            --bg-color: #0f0f0f;
+            --card-bg: #181818;
+            --primary-accent: #bb86fc; /* Purple */
+            --primary-hover: #9965f4;
+            --secondary-accent: #03dac6; /* Teal */
+            --spotify-green: #1DB954;
+            --error-color: #cf6679;
+            --text-main: #ffffff;
+            --text-muted: #b0b0b0;
+            --glass-bg: rgba(15, 15, 15, 0.90);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --nav-height: 80px;
+            --easing: cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .hidden { display: none !important; }
+
+        /* --- ADVANCED ANIMATIONS --- */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes shimmer { 
+            0% { background-position: -500px 0; } 
+            100% { background-position: 500px 0; } 
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.6; }
+            50% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.6; }
+        }
+
+        .animate-fade { animation: fadeIn 0.7s var(--easing) forwards; }
+        .animate-slide-up { animation: slideUp 0.7s var(--easing) forwards; opacity: 0; }
+        
+        /* SKELETON LOADER (Shimmer Effect) */
+        .skeleton {
+            background: #1f1f1f;
+            background-image: linear-gradient(90deg, #1f1f1f 0px, #2a2a2a 50px, #1f1f1f 100px);
+            background-size: 500px 100%;
+            animation: shimmer 1.5s infinite linear;
+            border-radius: 16px;
+        }
+        .skeleton-card { height: 350px; width: 100%; }
+
+        /* PAGE TRANSITION LOADER */
+        #pageLoader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color);
+            z-index: 50000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.4s ease;
+        }
+        .loader-pulse {
+            width: 60px; height: 60px;
+            background: var(--primary-accent);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite ease-in-out;
+            box-shadow: 0 0 20px rgba(187, 134, 252, 0.5);
+        }
+
+        /* --- NAVBAR --- */
+        nav {
+            position: sticky; top: 0; height: var(--nav-height);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 2rem; background: var(--glass-bg); backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border); z-index: 10000;
+        }
+
+        .nav-left { display: flex; align-items: center; gap: 2rem; }
+        .logo { font-weight: 800; font-size: 1.6rem; letter-spacing: -1px; color: var(--primary-accent); cursor: pointer; transition: transform 0.2s; }
+        .logo:active { transform: scale(0.95); }
+        .logo span { color: var(--text-main); }
+
+        .btn-about {
+            background: transparent; border: 1px solid var(--glass-border); color: var(--text-muted); 
+            padding: 8px 18px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; transition: 0.3s;
+        }
+        .btn-about:hover { border-color: var(--primary-accent); color: white; background: rgba(255,255,255,0.05); }
+
+        .search-container { position: relative; width: 320px; }
+        .search-bar {
+            width: 100%; padding: 12px 20px; border-radius: 30px; border: 1px solid var(--glass-border);
+            background: rgba(255,255,255,0.05); color: white; outline: none; transition: 0.3s; font-family: inherit; font-size: 0.95rem;
+        }
+        .search-bar:focus { border-color: var(--primary-accent); background: rgba(0,0,0,0.8); box-shadow: 0 0 20px rgba(187, 134, 252, 0.15); }
+        
+        .search-results {
+            position: absolute; top: 60px; left: 0; width: 100%; background: #1a1a1a;
+            border: 1px solid #333; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.9);
+            z-index: 20000; max-height: 400px; overflow-y: auto; opacity: 0; animation: scaleIn 0.2s forwards;
+        }
+        .search-item { 
+            padding: 14px 20px; cursor: pointer; border-bottom: 1px solid #2a2a2a; 
+            display: flex; align-items: center; justify-content: space-between; transition: background 0.2s;
+        }
+        .search-item:hover { background: var(--primary-accent); color: #000; }
+
+        /* --- DASHBOARD --- */
+        .dashboard-container { padding: 2rem; max-width: 1600px; margin: 0 auto; }
+        
+        .controls-header {
+            display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2.5rem; flex-wrap: wrap; gap: 2rem;
+            border-bottom: 1px solid #222; padding-bottom: 2rem;
+        }
+        
+        .toggle-switch { display: flex; background: #1a1a1a; border-radius: 30px; padding: 4px; border: 1px solid #333; }
+        .toggle-btn {
+            padding: 10px 24px; border-radius: 25px; border: none; background: transparent; color: var(--text-muted);
+            cursor: pointer; font-weight: 600; transition: 0.3s;
+        }
+        .toggle-btn.active { background: var(--primary-accent); color: #000; box-shadow: 0 2px 15px rgba(187, 134, 252, 0.3); }
+
+        .global-settings {
+            display: flex; gap: 1rem; align-items: center; background: #1a1a1a; padding: 10px 20px; border-radius: 12px; border: 1px solid #333;
+        }
+        .setting-group { display: flex; flex-direction: column; gap: 4px; }
+        .setting-label { font-size: 0.7rem; color: #888; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
+        .setting-select {
+            background: transparent; color: white; border: none; font-size: 0.95rem; font-family: inherit; font-weight: 600; cursor: pointer; outline: none;
+        }
+        .setting-select option { background: #1a1a1a; color: white; padding: 10px; }
+
+        .movie-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 2rem; padding-bottom: 4rem;
+        }
+
+        .movie-card {
+            background: var(--card-bg); border-radius: 16px; overflow: hidden; position: relative; cursor: pointer;
+            transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+        .movie-card:hover { transform: translateY(-10px) scale(1.03); box-shadow: 0 20px 40px rgba(0,0,0,0.6); z-index: 2; border: 1px solid var(--primary-accent); }
+        .movie-card img { width: 100%; height: 300px; object-fit: cover; background: #222; transition: opacity 0.3s; }
+        .movie-info { padding: 1rem; }
+        .movie-title { font-weight: 700; font-size: 1rem; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .movie-meta { font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between; }
+
+        /* --- MOVIE DETAILS --- */
+        .details-view { display: none; }
+        .hero {
+            height: 55vh; background-size: cover; background-position: center top; position: relative; display: flex; align-items: flex-end;
+        }
+        .hero::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(to bottom, rgba(15,15,15,0.2) 0%, var(--bg-color) 100%), 
+                        linear-gradient(to right, rgba(15,15,15,0.95) 0%, transparent 80%);
+        }
+        .hero-content {
+            position: relative; z-index: 2; padding: 0 3rem 3rem 3rem; display: flex; gap: 2.5rem; width: 100%; max-width: 1400px; margin: 0 auto; align-items: flex-end;
+        }
+        .hero-poster { width: 220px; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.2); animation: slideUp 0.8s var(--easing); }
+        .hero-text h1 { font-size: 3.5rem; margin-bottom: 0.5rem; line-height: 1.1; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
+        .hero-stats { display: flex; gap: 15px; font-size: 1rem; margin-bottom: 1.2rem; color: #e0e0e0; }
+        .tag { background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(4px); margin-right: 8px; margin-bottom: 5px; display: inline-block;}
+
+        /* --- TABS --- */
+        .tabs-container { max-width: 1200px; margin: -1rem auto 0 auto; padding: 0 2rem 4rem 2rem; position: relative; z-index: 5; }
+        .tabs-header { display: flex; gap: 2rem; border-bottom: 2px solid #2a2a2a; margin-bottom: 2rem; }
+        .tab-btn {
+            background: none; border: none; color: var(--text-muted); font-size: 1rem; padding: 0 0 12px 0; cursor: pointer; position: relative; transition: 0.3s; font-weight: 600;
+        }
+        .tab-btn.active { color: var(--primary-accent); }
+        .tab-btn.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 3px; background: var(--primary-accent); }
+
+        .tab-content { display: none; }
+        .tab-content.active-content { display: block; animation: slideUp 0.5s var(--easing); }
+
+        .overview-text { font-size: 1.1rem; line-height: 1.7; color: #d0d0d0; max-width: 900px; margin-bottom: 2rem; }
+
+        /* AI Analysis Styles */
+        .ai-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+        .ai-card { background: #1c1c1c; padding: 1.5rem; border-radius: 12px; border: 1px solid #333; transition: transform 0.3s; }
+        .ai-card:hover { transform: translateY(-5px); border-color: #444; }
+        .ai-card.highlight { border: 1px solid var(--primary-accent); background: rgba(187, 134, 252, 0.03); }
+        .ai-title { color: var(--primary-accent); font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: 10px; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; }
+        .ai-list { list-style: none; padding-left: 0; }
+        .ai-list li { margin-bottom: 10px; display: flex; align-items: flex-start; gap: 10px; line-height: 1.5; color: #ddd; font-size: 0.95rem; }
+        .ai-list li::before { content: '•'; color: var(--secondary-accent); font-size: 1.2rem; line-height: 1; }
+
+        .btn-primary {
+            background: var(--primary-accent); color: #000; border: none; padding: 12px 28px; border-radius: 30px; font-weight: 700; cursor: pointer; 
+            display: inline-flex; align-items: center; justify-content: center; gap: 10px; transition: 0.2s; font-size: 0.95rem; min-width: 180px;
+        }
+        .btn-primary:hover { background: var(--primary-hover); transform: scale(1.05); box-shadow: 0 0 20px rgba(187,134,252,0.4); }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-primary:disabled { background: #444; color: #888; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .btn-action {
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: white; padding: 8px 18px; border-radius: 20px; 
+            cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; text-decoration: none; transition: 0.3s; font-size: 0.85rem;
+        }
+        .btn-action:hover { background: rgba(255,255,255,0.1); transform: translateY(-2px); }
+        .btn-spotify { border-color: rgba(29, 185, 84, 0.5); color: var(--spotify-green); }
+        .btn-spotify:hover { background: var(--spotify-green); color: white; }
+
+        .rec-section { margin-top: 2rem; border-top: 1px solid #222; padding-top: 2rem; }
+        .error-box { padding: 2rem; border: 1px solid var(--error-color); background: rgba(207, 102, 121, 0.1); border-radius: 12px; color: #ffcccc; text-align: center; margin-top: 1rem; }
+
+        /* --- ABOUT MODAL --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            z-index: 30000; display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s;
+        }
+        .modal-content {
+            background: #1c1c1c; width: 90%; max-width: 650px; max-height: 85vh; overflow-y: auto; border-radius: 20px; border: 1px solid #333; padding: 2.5rem;
+            transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+        }
+        .modal-overlay.open { display: flex; opacity: 1; }
+        .modal-overlay.open .modal-content { transform: scale(1); }
+        
+        .code-snippet { background: #111; padding: 12px 16px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.9rem; color: #a9b7c6; border: 1px solid #333; display: block; margin: 15px 0; white-space: pre-wrap; }
+        .engine-block { margin-bottom: 25px; border-bottom: 1px solid #2a2a2a; padding-bottom: 20px; }
+        .engine-block:last-child { border-bottom: none; }
+
+        /* --- RESPONSIVE --- */
+        @media (max-width: 768px) {
+            nav { padding: 0 1.5rem; height: auto; flex-direction: column; gap: 1rem; padding-bottom: 1rem; }
+            .nav-left { width: 100%; justify-content: space-between; }
+            .search-container { width: 100%; }
+            .search-bar { padding: 12px 20px; font-size: 1rem; }
+            .controls-header { flex-direction: column; align-items: stretch; gap: 1.5rem; }
+            .global-settings { flex-direction: column; align-items: stretch; }
+            .hero { height: auto; min-height: 50vh; }
+            .hero-content { flex-direction: column; align-items: flex-start; padding: 2rem; gap: 2rem; }
+            .hero-poster { width: 160px; margin: 0 auto; }
+            .hero-text h1 { font-size: 2.5rem; text-align: center; }
+            .hero-stats { justify-content: center; }
+            .movie-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1.5rem; }
+            .movie-card img { height: 220px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="pageLoader" class="hidden">
+        <div class="loader-pulse"></div>
+        <p style="margin-top: 20px; font-weight: 700; color: var(--primary-accent); letter-spacing: 1.5px; font-size: 1.1rem;">LOADING MOVIE DATA</p>
+    </div>
+
+    <nav>
+        <div class="nav-left">
+            <div class="logo" onclick="app.goHome()">Cine<span>AI</span></div>
+            <button class="btn-about" onclick="app.openAbout()">About</button>
+        </div>
+        <div class="search-container">
+            <input type="text" class="search-bar" id="searchInput" placeholder="Search movies..." autocomplete="off">
+            <div class="search-results hidden" id="searchResults"></div>
+        </div>
+    </nav>
+
+    <div class="modal-overlay" id="aboutModal" onclick="if(event.target === this) app.closeAbout()">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem; border-bottom:1px solid #333; padding-bottom:1rem;">
+                <h2 style="margin:0; font-size: 2rem;">About CineAI</h2>
+                <button onclick="app.closeAbout()" style="background:none; border:none; color:white; font-size:2rem; cursor:pointer;">&times;</button>
+            </div>
+            
+            <p style="color:#ccc; line-height:1.8; margin-bottom:2.5rem; font-size: 1.1rem;">
+                Hi, I'm <strong>Junaid</strong>. I developed CineAI to showcase the potential of combining Large Language Models with advanced vector search technologies to create a next-generation movie discovery platform.
+            </p>
+
+            <h3 style="color:var(--primary-accent); margin-bottom:20px; font-size: 1.5rem;">Our Recommendation Engines</h3>
+            <p style="color:#aaa; font-size:1rem; margin-bottom:25px;">Select your preferred algorithm from the Home Dashboard settings.</p>
+
+            <div class="engine-block">
+                <strong style="color:white; font-size: 1.2rem;">1. Embedding Engine (FAISS)</strong>
+                <p style="color:#aaa; font-size:1rem; margin-top:10px; line-height: 1.6;">Utilizes a deep learning model to convert movie plots into high-dimensional vectors. It then uses Facebook AI Similarity Search (FAISS) to find movies with the closest semantic meaning and thematic context, regardless of shared keywords.</p>
+            </div>
+            <div class="engine-block">
+                <strong style="color:white; font-size: 1.2rem;">2. TF-IDF Engine (Keyword)</strong>
+                <p style="color:#aaa; font-size:1rem; margin-top:10px; line-height: 1.6;">Employs Term Frequency-Inverse Document Frequency to analyze the importance of keywords in movie descriptions and tags. It calculates cosine similarity to recommend movies that share the most significant and unique terms.</p>
+            </div>
+            <div class="engine-block">
+                <strong style="color:white; font-size: 1.2rem;">3. Hybrid Engine (Best)</strong>
+                <p style="color:#aaa; font-size:1rem; margin-top:10px; line-height: 1.6;">Combines the strengths of both approaches for the most accurate results. It normalizes the scores from both engines and calculates a final weighted score.</p>
+                <span class="code-snippet">Final Score = (0.6 * Normalized Embedding Score) + (0.4 * Normalized TF-IDF Score)</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="homeView">
+        <div class="dashboard-container">
+            
+            <div class="controls-header animate-fade">
+                <div>
+                    <h2 style="font-weight: 300; font-size: 2rem; margin-bottom: 10px;">Discover <strong style="font-weight: 800;">Movies</strong></h2>
+                    <p style="color:var(--text-muted); font-size:1rem;">Explore trending films or search our extensive database.</p>
+                </div>
+                
+                <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                    <div class="global-settings">
+                        <div class="setting-group">
+                            <label class="setting-label">AI Engine</label>
+                            <select id="globalEngine" class="setting-select">
+                                <option value="hybrid">Hybrid (Best)</option>
+                                <option value="embedding">Embedding</option>
+                                <option value="tfidf">Keyword</option>
+                            </select>
+                        </div>
+                        <div style="width:1px; height:40px; background:#333;"></div>
+                        <div class="setting-group">
+                            <label class="setting-label">Quantity</label>
+                            <select id="globalCount" class="setting-select">
+                                <option value="4">4 Recs</option>
+                                <option value="8">8 Recs</option>
+                                <option value="12">12 Recs</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="toggle-switch">
+                        <button class="toggle-btn active" onclick="app.switchFeed('trending')" id="btnTrending">Trending</button>
+                        <button class="toggle-btn" onclick="app.switchFeed('popular')" id="btnPopular">Popular</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="movie-grid" id="movieGrid">
+                </div>
+        </div>
+    </div>
+
+    <div id="detailsView" class="details-view">
+        <div class="hero" id="heroSection">
+            <div class="hero-content animate-slide-up">
+                <img src="" alt="Poster" class="hero-poster" id="heroPoster">
+                <div class="hero-text">
+                    <h1 id="heroTitle">Movie Title</h1>
+                    <div class="hero-stats">
+                        <span id="heroDate">2023</span>
+                        <span id="heroRating"><i class="fas fa-star" style="color: gold;"></i> 8.5</span>
+                        <span id="heroRuntime">120 min</span>
+                    </div>
+                    <div class="tags" id="heroGenres"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tabs-container animate-slide-up" style="animation-delay: 0.1s;">
+            <div class="tabs-header">
+                <button class="tab-btn active" onclick="app.openTab('tabOverview', this)">Overview</button>
+                <button class="tab-btn" onclick="app.openTab('tabAI', this)">AI Analysis</button>
+                <button class="tab-btn" onclick="app.openTab('tabSentiment', this)">Reviews</button>
+            </div>
+
+            <div id="tabOverview" class="tab-content active-content">
+                <p class="overview-text" id="overviewText">Plot summary...</p>
+                
+                <div class="rec-section">
+                    <h4 style="margin-bottom:1.5rem; color:var(--text-muted); text-transform:uppercase; font-size:0.9rem; letter-spacing:1.5px; font-weight: 700;">
+                        <i class="fas fa-magic" style="margin-right:10px; color:var(--primary-accent);"></i> More Like This
+                    </h4>
+                    
+                    <div class="movie-grid" id="recGrid" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));"></div>
+                    <div id="recError" class="hidden error-box">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 15px;"></i><br>
+                        <strong style="font-size: 1.2rem;">Not in Local Database</strong><br>
+                        <p style="margin-top: 10px; font-size: 1rem; line-height: 1.5;">Recommendation engine requires the movie to be present in our local vector dataset. Other features like AI Analysis and Sentiment will still work.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tabAI" class="tab-content">
+                <div id="aiStartScreen" style="text-align: center; padding: 5rem 2rem; background: #1a1a1a; border-radius: 16px; border: 1px dashed #333;">
+                    <i class="fas fa-brain" style="font-size: 4rem; color: #333; margin-bottom: 1.5rem;"></i>
+                    <p style="margin-bottom: 2.5rem; color: #aaa; font-size: 1.2rem;">Generate deep insights, themes, and audio summaries using LLMs.</p>
+                    <button id="btnGenerateAI" class="btn-primary" type="button" onclick="app.generateSummary()">
+                        <i class="fas fa-bolt"></i> Generate Analysis
+                    </button>
+                </div>
+                
+                <div id="aiResult" class="hidden animate-fade">
+                    <div class="ai-card highlight">
+                        <div class="ai-title"><i class="fas fa-robot"></i> Executive Summary</div>
+                        <p id="aiOverviewText" style="color: #ddd; line-height: 1.7; margin-bottom: 2rem; font-size: 1.05rem;"></p>
+                        
+                        <div class="action-btn-container" id="aiActionButtons" style="display:flex; gap:15px; flex-wrap:wrap;"></div>
+                        
+                        <audio id="audioPlayer" style="width:100%; margin-top:20px; display:none; border-radius:10px;" controls></audio>
+                        <div id="audioStatus" style="font-size: 0.9rem; color: var(--secondary-accent); margin-top: 15px; display: none;"></div>
+                    </div>
+
+                    <div class="ai-grid">
+                        <div class="ai-card" style="animation-delay: 0.1s"><div class="ai-title"><i class="fas fa-video"></i> Key Moments</div><ul class="ai-list" id="aiKeyMoments"></ul></div>
+                        <div class="ai-card" style="animation-delay: 0.2s"><div class="ai-title"><i class="fas fa-layer-group"></i> Themes</div><ul class="ai-list" id="aiThemes"></ul></div>
+                        <div class="ai-card" style="animation-delay: 0.3s"><div class="ai-title"><i class="fas fa-lightbulb"></i> Fun Facts</div><ul class="ai-list" id="aiFacts"></ul></div>
+                        <div class="ai-card" style="animation-delay: 0.4s"><div class="ai-title"><i class="fas fa-music"></i> Soundtrack</div><ul class="ai-list" id="aiSoundtrack"></ul></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tabSentiment" class="tab-content">
+                <div style="display:flex; gap:2.5rem; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:320px; background:#1c1c1c; padding:2.5rem; border-radius:16px;">
+                        <h3 style="margin-bottom: 2rem; font-size: 1.5rem;">Review Analysis</h3>
+                        <div style="margin-bottom:2rem;">
+                            <label style="display:block; color:#888; margin-bottom:10px; font-size:1rem;">Review Count</label>
+                            <input type="number" id="reviewCount" value="50" min="10" max="100" style="background:#111; border:1px solid #333; color:white; padding:15px; width:100%; border-radius:10px; outline:none; font-size: 1.1rem;">
+                        </div>
+                        <button id="btnAnalyze" class="btn-primary" type="button" onclick="app.analyzeSentiment()" style="width: 100%; padding: 15px;">
+                            <i class="fas fa-chart-pie"></i> Analyze Data
+                        </button>
+                    </div>
+                    
+                    <div class="chart-wrapper" style="flex:1; min-width:320px; height:400px; position:relative; display:flex; align-items:center; justify-content:center;">
+                        <canvas id="sentimentChart"></canvas>
+                        <div id="chartPlaceholder" style="position: absolute; color: #444; border: 3px dashed #333; width:220px; height:220px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size: 1.2rem;">No Data</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "https://junaid17-cenai-recomendations.hf.space";
+        let currentMovie = {}; 
+        let sentimentChartInstance = null;
+        let debounceTimer;
+
+        const app = {
+            init: () => {
+                app.fetchFeed('trending');
+                
+                document.getElementById('searchInput').addEventListener('input', (e) => {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => app.handleSearch(e.target.value), 300);
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!e.target.closest('.search-container')) {
+                        document.getElementById('searchResults').classList.add('hidden');
+                    }
+                });
+            },
+
+            openAbout: () => { document.getElementById('aboutModal').classList.add('open'); document.body.style.overflow = 'hidden'; },
+            closeAbout: () => { document.getElementById('aboutModal').classList.remove('open'); document.body.style.overflow = 'auto'; },
+
+            showPageLoader: () => document.getElementById('pageLoader').classList.remove('hidden'),
+            hidePageLoader: () => document.getElementById('pageLoader').classList.add('hidden'),
+
+            renderSkeletonGrid: (container, count=4) => {
+                container.innerHTML = Array(count).fill(0).map(() => 
+                    `<div class="skeleton skeleton-card"></div>`
+                ).join('');
+            },
+
+            goHome: () => {
+                document.getElementById('detailsView').style.display = 'none';
+                document.getElementById('homeView').style.display = 'block';
+                window.scrollTo(0,0);
+            },
+
+            goToDetails: async (title) => {
+                app.showPageLoader();
+                document.getElementById('searchResults').classList.add('hidden');
+                document.getElementById('searchInput').value = '';
+
+                try {
+                    const res = await fetch(`${API_BASE}/movie-info/${encodeURIComponent(title)}`);
+                    if (!res.ok) throw new Error("Failed");
+                    const data = await res.json();
+                    
+                    currentMovie = data;
+                    
+                    document.getElementById('heroTitle').innerText = data.title;
+                    document.getElementById('heroDate').innerText = data.release_date ? data.release_date.split('-')[0] : 'N/A';
+                    document.getElementById('heroRating').innerHTML = `<i class="fas fa-star" style="color: gold;"></i> ${data.rating ? data.rating.toFixed(1) : 'N/A'}`;
+                    document.getElementById('heroRuntime').innerText = `${data.runtime || '?'} min`;
+                    document.getElementById('overviewText').innerText = data.overview || "No overview available.";
+                    
+                    document.getElementById('heroPoster').src = data.poster ? `https://image.tmdb.org/t/p/w500${data.poster}` : 'https://via.placeholder.com/300x450';
+                    const bg = data.backdrop ? `url('https://image.tmdb.org/t/p/original${data.backdrop}')` : 'none';
+                    document.getElementById('heroSection').style.backgroundImage = bg;
+                    document.getElementById('heroSection').style.backgroundColor = data.backdrop ? 'transparent' : '#111';
+
+                    document.getElementById('heroGenres').innerHTML = (data.genres || []).map(g => `<span class="tag">${g}</span>`).join('');
+
+                    const engine = document.getElementById('globalEngine').value;
+                    const count = document.getElementById('globalCount').value;
+                    app.loadRecommendations(data.title, engine, parseInt(count));
+
+                    app.openTab('tabOverview', document.querySelector('.tab-btn')); 
+                    document.getElementById('aiStartScreen').classList.remove('hidden');
+                    document.getElementById('aiResult').classList.add('hidden');
+                    document.getElementById('chartPlaceholder').style.display = 'flex';
+                    document.getElementById('audioPlayer').style.display = 'none';
+                    document.getElementById('audioPlayer').src = "";
+                    if(sentimentChartInstance) sentimentChartInstance.destroy();
+
+                    document.getElementById('homeView').style.display = 'none';
+                    document.getElementById('detailsView').style.display = 'block';
+                    window.scrollTo(0,0);
+
+                } catch (e) {
+                    alert("Could not load movie data.");
+                } finally {
+                    setTimeout(() => app.hidePageLoader(), 500);
+                }
+            },
+
+            switchFeed: (type) => {
+                document.getElementById('btnTrending').classList.toggle('active', type === 'trending');
+                document.getElementById('btnPopular').classList.toggle('active', type === 'popular');
+                app.fetchFeed(type);
+            },
+
+            fetchFeed: async (endpoint) => {
+                const grid = document.getElementById('movieGrid');
+                app.renderSkeletonGrid(grid, 12);
+                try {
+                    const res = await fetch(`${API_BASE}/movies/${endpoint}`);
+                    const data = await res.json();
+                    app.renderGrid(data, grid);
+                } catch (e) {
+                    grid.innerHTML = '<div style="color:var(--error-color)">Server Offline</div>';
+                }
+            },
+
+            renderGrid: (movies, container) => {
+                if(!movies || movies.length === 0) {
+                    container.innerHTML = "No movies found."; return;
+                }
+                container.innerHTML = movies.map((m, index) => `
+                    <div class="movie-card animate-slide-up" style="animation-delay: ${index * 0.05}s" onclick="app.goToDetails('${m.title.replace(/'/g, "\\'")}')">
+                        <img src="${m.poster || 'https://via.placeholder.com/300x450'}" alt="${m.title}" loading="lazy">
+                        <div class="movie-info">
+                            <div class="movie-title">${m.title}</div>
+                            <div class="movie-meta">
+                                <span>${(m.release_date || "").substring(0,4)}</span>
+                                <span><i class="fas fa-star" style="color: var(--primary-accent)"></i> ${m.rating || '?'}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            },
+
+            handleSearch: async (query) => {
+                const resultsBox = document.getElementById('searchResults');
+                if (query.length < 2) { resultsBox.classList.add('hidden'); return; }
+
+                try {
+                    const res = await fetch(`${API_BASE}/movies/search?query=${encodeURIComponent(query)}`);
+                    const data = await res.json();
+                    
+                    if (data.results && data.results.length > 0) {
+                        resultsBox.innerHTML = data.results.map(title => `
+                            <div class="search-item" onclick="app.goToDetails('${title.replace(/'/g, "\\'")}')">
+                                <span>${title}</span>
+                                <i class="fas fa-chevron-right" style="font-size:0.7rem; opacity:0.5;"></i>
+                            </div>
+                        `).join('');
+                        resultsBox.classList.remove('hidden');
+                    } else { resultsBox.classList.add('hidden'); }
+                } catch (e) { console.log(e); }
+            },
+
+            openTab: (tabId, btn) => {
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active-content'));
+                document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+                document.getElementById(tabId).classList.add('active-content');
+                if(btn) btn.classList.add('active');
+            },
+
+            generateSummary: async () => {
+                const btn = document.getElementById('btnGenerateAI');
+                const originalText = btn.innerHTML;
+                
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Thinking...';
+                
+                try {
+                    const res = await fetch(`${API_BASE}/summarize-movie`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title: currentMovie.title, overview: currentMovie.overview || "" })
+                    });
+                    
+                    if (!res.ok) throw new Error("AI Busy");
+                    let data = await res.json();
+                    if (typeof data === 'string') { try { data = JSON.parse(data); } catch(e){} }
+
+                    document.getElementById('aiOverviewText').innerText = data.overview || currentMovie.overview;
+
+                    const fillList = (id, items) => {
+                        const el = document.getElementById(id);
+                        if (!items || items.length === 0) el.innerHTML = "<li>No data</li>";
+                        else el.innerHTML = items.map(i => {
+                            if(i.includes('http')) {
+                                const url = i.match(/(https?:\/\/[^\s]+)/g)[0];
+                                return `<li><a href="${url}" target="_blank" class="btn-action btn-spotify"><i class="fab fa-spotify"></i> Listen</a></li>`;
+                            }
+                            return `<li>${i}</li>`;
+                        }).join('');
+                    };
+
+                    fillList('aiKeyMoments', data.key_moments);
+                    fillList('aiThemes', data.themes);
+                    fillList('aiFacts', data.notable_facts);
+                    fillList('aiSoundtrack', data.soundtrack_highlights);
+
+                    const btnContainer = document.getElementById('aiActionButtons');
+                    let btnsHtml = `
+                        <button class="btn-action" style="color:var(--secondary-accent); border-color:var(--secondary-accent);" onclick="app.playAudioSummary()">
+                            <i class="fas fa-volume-up"></i> Listen Summary
+                        </button>
+                    `;
+
+                    if(data.official_trailer && data.official_trailer !== "N/A") {
+                        let href = data.official_trailer.includes("http") ? data.official_trailer : `https://www.youtube.com/results?search_query=${encodeURIComponent(data.official_trailer + " trailer")}`;
+                        btnsHtml += `<a href="${href}" target="_blank" class="btn-action" style="color:#ff5555; border-color:#ff5555;"><i class="fab fa-youtube"></i> Watch Trailer</a>`;
+                    }
+                    btnContainer.innerHTML = btnsHtml;
+
+                    document.getElementById('aiStartScreen').classList.add('hidden');
+                    document.getElementById('aiResult').classList.remove('hidden');
+
+                } catch (e) {
+                    alert(e.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            },
+
+            playAudioSummary: async () => {
+                const player = document.getElementById('audioPlayer');
+                const status = document.getElementById('audioStatus');
+                const text = document.getElementById('aiOverviewText').innerText;
+
+                if (player.style.display === 'block') {
+                    if(player.paused) player.play(); else player.pause();
+                    return;
+                }
+
+                status.style.display = 'block';
+                status.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Generating Voice...';
+                
+                try {
+                    const safeText = text.substring(0, 300); 
+                    const res = await fetch(`${API_BASE}/TTS/${encodeURIComponent(safeText)}`);
+                    if(!res.ok) throw new Error();
+                    const blob = await res.blob();
+                    player.src = URL.createObjectURL(blob);
+                    player.style.display = 'block';
+                    player.play();
+                    status.style.display = 'none';
+                } catch (e) {
+                    status.innerText = "Audio Error";
+                    status.style.color = "var(--error-color)";
+                }
+            },
+
+            loadRecommendations: async (title, engine, k) => {
+                const grid = document.getElementById('recGrid');
+                const errBox = document.getElementById('recError');
+                
+                grid.classList.remove('hidden');
+                errBox.classList.add('hidden');
+                app.renderSkeletonGrid(grid, k);
+
+                try {
+                    const res = await fetch(`${API_BASE}/recomendation`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ movie_title: title, engine: engine, top_k: k })
+                    });
+
+                    if (res.status === 404) {
+                        grid.classList.add('hidden');
+                        errBox.classList.remove('hidden');
+                        return;
+                    }
+
+                    const data = await res.json();
+                    
+                    const recsWithPosters = await Promise.all(data.results.map(async (m) => {
+                        try {
+                            const infoRes = await fetch(`${API_BASE}/movie-info/${encodeURIComponent(m.title)}`);
+                            if(infoRes.ok) {
+                                const info = await infoRes.json();
+                                return { ...m, poster: info.poster, rating: info.rating, release_date: info.release_date };
+                            }
+                            return m;
+                        } catch(e) { return m; }
+                    }));
+
+                    app.renderGrid(recsWithPosters, grid);
+
+                } catch (e) {
+                    grid.classList.add('hidden');
+                    errBox.classList.remove('hidden');
+                }
+            },
+
+            analyzeSentiment: async () => {
+                const count = document.getElementById('reviewCount').value;
+                const btn = document.getElementById('btnAnalyze');
+                const originalText = btn.innerHTML;
+                const placeholder = document.getElementById('chartPlaceholder');
+
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Analyzing...';
+                placeholder.classList.add('hidden');
+                
+                if(sentimentChartInstance) sentimentChartInstance.destroy();
+
+                try {
+                    const res = await fetch(`${API_BASE}/movie-reviews-sentiment`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title: currentMovie.title, num_reviews: parseInt(count) })
+                    });
+
+                    if (res.status === 404) { alert("No reviews available."); return; }
+                    const data = await res.json();
+                    const stats = data.sentiment_distribution;
+
+                    const ctx = document.getElementById('sentimentChart').getContext('2d');
+                    sentimentChartInstance = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Positive', 'Neutral', 'Negative'],
+                            datasets: [{
+                                data: [stats.positive, stats.neutral, stats.negative],
+                                backgroundColor: ['#03dac6', '#bb86fc', '#cf6679'],
+                                borderWidth: 0, hoverOffset: 10
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: { position: 'bottom', labels: { color: 'white', padding: 25, font: { size: 14 } } }
+                            }
+                        }
+                    });
+                } catch (e) { 
+                    alert("Analysis failed."); 
+                    placeholder.classList.remove('hidden');
+                } finally { 
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', app.init);
+    </script>
+</body>
+</html>

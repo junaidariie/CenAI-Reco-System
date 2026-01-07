@@ -1,0 +1,14 @@
+pandas
+sentence-transformers
+nltk
+numpy
+faiss-cpu
+scikit-learn
+fastapi
+edge_tts
+langchain
+langgraph
+langchain-community
+langchain-openai
+uvicorn
+langchain-groq
